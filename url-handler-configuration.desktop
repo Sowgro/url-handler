@@ -1,0 +1,4 @@
+[Desktop Entry]
+Type=Application
+Name=App URL Handler Configuration
+Exec=python /home/sowgro/Code/url-handler/url-handler-configuration.py

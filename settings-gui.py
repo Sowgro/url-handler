@@ -2,13 +2,14 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw
+from gi.repository import Gtk, Adw, Gdk, GObject
 import json
 import os
 import re
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
 MATCHERS = ["startswith", "contains", "endswith"]
+MATCHER_LABELS = ["Starts with", "Contains", "Ends with"]
 
 
 def load_config():
@@ -50,26 +51,44 @@ def open_app_chooser(parent_win, on_chosen):
 
 
 class HandlerRow(Adw.ExpanderRow):
-    def __init__(self, handler, on_delete):
+    def __init__(self, handler, on_delete, on_reorder, on_change):
         super().__init__()
         self._on_delete = on_delete
+        self._on_reorder = on_reorder
+        self._on_change = on_change
         self._setup(handler)
 
     def _setup(self, handler):
+        # Drag handle — button stops click from toggling the expander
+        handle = Gtk.Button(icon_name="list-drag-handle-symbolic")
+        handle.add_css_class("flat")
+        handle.set_can_focus(False)
+        handle.set_cursor_from_name("grab")
+        drag_src = Gtk.DragSource(actions=Gdk.DragAction.MOVE)
+        drag_src.connect("prepare", self._on_drag_prepare)
+        handle.add_controller(drag_src)
+        self.add_prefix(handle)
+
+        # Drop target covers the whole row
+        drop_tgt = Gtk.DropTarget.new(GObject.TYPE_OBJECT, Gdk.DragAction.MOVE)
+        drop_tgt.connect("drop", self._on_drop)
+        self.add_controller(drop_tgt)
+
+        # Match type — values set before signals are connected so they don't fire _on_change
         self._matcher_row = Adw.ComboRow(title="Match type")
-        self._matcher_row.set_model(Gtk.StringList.new(MATCHERS))
+        self._matcher_row.set_model(Gtk.StringList.new(MATCHER_LABELS))
         self._matcher_row.set_selected(MATCHERS.index(handler.get("matcher", "startswith")))
-        self._matcher_row.connect("notify::selected", self._sync_title)
+        self._matcher_row.connect("notify::selected", self._on_field_changed)
         self.add_row(self._matcher_row)
 
         self._pattern_row = Adw.EntryRow(title="URL pattern")
         self._pattern_row.set_text(handler.get("string", ""))
-        self._pattern_row.connect("changed", self._sync_title)
+        self._pattern_row.connect("changed", self._on_field_changed)
         self.add_row(self._pattern_row)
 
         self._exec_row = Adw.EntryRow(title="Command")
         self._exec_row.set_text(handler.get("exec", ""))
-        self._exec_row.connect("changed", self._sync_title)
+        self._exec_row.connect("changed", self._on_field_changed)
         pick_btn = Gtk.Button(icon_name="application-x-executable-symbolic")
         pick_btn.set_valign(Gtk.Align.CENTER)
         pick_btn.add_css_class("flat")
@@ -88,10 +107,26 @@ class HandlerRow(Adw.ExpanderRow):
 
         self._sync_title()
 
+    def _on_drag_prepare(self, src, x, y):
+        val = GObject.Value()
+        val.init(GObject.TYPE_OBJECT)
+        val.set_object(self)
+        return Gdk.ContentProvider.new_for_value(val)
+
+    def _on_drop(self, tgt, value, x, y):
+        if isinstance(value, HandlerRow) and value is not self:
+            self._on_reorder(value, self)
+        return True
+
+    def _on_field_changed(self, *_):
+        self._sync_title()
+        self._on_change()
+
     def _sync_title(self, *_):
-        matcher = MATCHERS[self._matcher_row.get_selected()]
+        idx = self._matcher_row.get_selected()
+        label = MATCHER_LABELS[idx] if idx < len(MATCHER_LABELS) else ""
         pattern = self._pattern_row.get_text()
-        self.set_title(f"{matcher}: {pattern}" if pattern else "(new rule)")
+        self.set_title(f"{label}: {pattern}" if pattern else "(new rule)")
         self.set_subtitle(self._exec_row.get_text())
 
     def get_data(self):
@@ -115,10 +150,11 @@ class SettingsWindow(Adw.ApplicationWindow):
         toolbar_view = Adw.ToolbarView()
 
         header = Adw.HeaderBar()
-        save_btn = Gtk.Button(label="Save")
-        save_btn.add_css_class("suggested-action")
-        save_btn.connect("clicked", self._on_save)
-        header.pack_end(save_btn)
+        self._save_btn = Gtk.Button(label="Save")
+        self._save_btn.add_css_class("suggested-action")
+        self._save_btn.set_sensitive(False)
+        self._save_btn.connect("clicked", self._on_save)
+        header.pack_end(self._save_btn)
         toolbar_view.add_top_bar(header)
 
         scroll = Gtk.ScrolledWindow(vexpand=True)
@@ -140,6 +176,8 @@ class SettingsWindow(Adw.ApplicationWindow):
             self, self._default_exec_row.set_text
         ))
         self._default_exec_row.add_suffix(pick_btn)
+        # Connect after set_text so initial population doesn't mark dirty
+        self._default_exec_row.connect("changed", self._mark_dirty)
         default_group.add(self._default_exec_row)
         page.add(default_group)
 
@@ -150,7 +188,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.add_css_class("flat")
         add_btn.set_tooltip_text("Add rule")
-        add_btn.connect("clicked", lambda _: self._append_row())
+        add_btn.connect("clicked", self._on_add_rule)
         self._rules_group.set_header_suffix(add_btn)
 
         for h in config.get("handlers", []):
@@ -162,17 +200,37 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._toast_overlay.set_child(toolbar_view)
         self.set_content(self._toast_overlay)
 
+    def _mark_dirty(self, *_):
+        self._save_btn.set_sensitive(True)
+
     def _append_row(self, handler=None):
         row = HandlerRow(
             handler or {"matcher": "startswith", "string": "", "exec": ""},
             self._remove_row,
+            self._reorder_row,
+            self._mark_dirty,
         )
         self._handler_rows.append(row)
         self._rules_group.add(row)
 
+    def _on_add_rule(self, _):
+        self._append_row()
+        self._mark_dirty()
+
     def _remove_row(self, row):
         self._handler_rows.remove(row)
         self._rules_group.remove(row)
+        self._mark_dirty()
+
+    def _reorder_row(self, dragged, target):
+        src_idx = self._handler_rows.index(dragged)
+        dst_idx = self._handler_rows.index(target)
+        self._handler_rows.insert(dst_idx, self._handler_rows.pop(src_idx))
+        for row in list(self._handler_rows):
+            self._rules_group.remove(row)
+        for row in self._handler_rows:
+            self._rules_group.add(row)
+        self._mark_dirty()
 
     def _on_save(self, *_):
         config = {
@@ -180,6 +238,7 @@ class SettingsWindow(Adw.ApplicationWindow):
             "handlers": [r.get_data() for r in self._handler_rows],
         }
         save_config(config)
+        self._save_btn.set_sensitive(False)
         self._toast_overlay.add_toast(Adw.Toast.new("Settings saved"))
 
 

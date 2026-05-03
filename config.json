@@ -1,0 +1,17 @@
+{
+  "default": {
+    "exec": "firefox {}"
+  },
+  "handlers": [
+    {
+      "matcher": "startswith",
+      "string": "https://open.spotify.com/",
+      "exec": "flatpak run com.spotify.Client {}"
+    },
+    {
+      "matcher": "startswith",
+      "string": "https://discord.com/",
+      "exec": "flatpak run com.discordapp.Discord {}"
+    }
+  ]
+}

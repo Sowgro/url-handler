@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+# NOTE: this entire file was generated with claude
+
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -59,10 +62,9 @@ class HandlerRow(Adw.ExpanderRow):
         self._setup(handler)
 
     def _setup(self, handler):
-        # Drag handle — button stops click from toggling the expander
-        handle = Gtk.Button(icon_name="list-drag-handle-symbolic")
-        handle.add_css_class("flat")
-        handle.set_can_focus(False)
+        handle = Gtk.Image(icon_name="list-drag-handle-symbolic")
+        handle.add_css_class("dim-label")
+        handle.set_margin_start(2)
         handle.set_cursor_from_name("grab")
         drag_src = Gtk.DragSource(actions=Gdk.DragAction.MOVE)
         drag_src.connect("prepare", self._on_drag_prepare)
@@ -126,7 +128,7 @@ class HandlerRow(Adw.ExpanderRow):
         idx = self._matcher_row.get_selected()
         label = MATCHER_LABELS[idx] if idx < len(MATCHER_LABELS) else ""
         pattern = self._pattern_row.get_text()
-        self.set_title(f"{label}: {pattern}" if pattern else "(new rule)")
+        self.set_title(f'{label} "{pattern}"' if pattern else "(new rule)")
         self.set_subtitle(self._exec_row.get_text())
 
     def get_data(self):
@@ -183,7 +185,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         self._rules_group = Adw.PreferencesGroup(
             title="URL Rules",
-            description="Rules are evaluated in order; the first match wins",
+            description="Rules are evaluated in order; the first match will be used.",
         )
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.add_css_class("flat")

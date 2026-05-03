@@ -56,6 +56,8 @@ def open_app_chooser(parent_win, on_chosen):
 class HandlerRow(Adw.ExpanderRow):
     def __init__(self, handler, on_delete, on_reorder, on_change):
         super().__init__()
+        self.set_title_lines(1)
+        self.set_subtitle_lines(1)
         self._on_delete = on_delete
         self._on_reorder = on_reorder
         self._on_change = on_change

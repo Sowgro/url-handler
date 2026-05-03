@@ -142,7 +142,7 @@ class HandlerRow(Adw.ExpanderRow):
 class SettingsWindow(Adw.ApplicationWindow):
     def __init__(self, config, **kwargs):
         super().__init__(**kwargs)
-        self.set_title("URL Handler Settings")
+        self.set_title("URL Handler Configuration")
         self.set_default_size(640, 560)
         self._handler_rows = []
         self._build(config)
@@ -184,7 +184,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(default_group)
 
         self._rules_group = Adw.PreferencesGroup(
-            title="Application URL Handler Rules",
+            title="Application URL Handlers",
             description="Rules are evaluated in order; the first match will be used.",
         )
         add_btn = Gtk.Button(icon_name="list-add-symbolic")

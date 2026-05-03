@@ -5,12 +5,12 @@
   "handlers": [
     {
       "matcher": "startswith",
-      "string": "https://open.spotify.com/",
+      "pattern": "https://open.spotify.com/",
       "exec": "flatpak run com.spotify.Client {}"
     },
     {
       "matcher": "startswith",
-      "string": "https://discord.com/",
+      "pattern": "https://discord.com/",
       "exec": "flatpak run com.discordapp.Discord {}"
     }
   ]

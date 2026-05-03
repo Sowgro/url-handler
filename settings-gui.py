@@ -86,7 +86,7 @@ class HandlerRow(Adw.ExpanderRow):
         self.add_row(self._matcher_row)
 
         self._pattern_row = Adw.EntryRow(title="URL pattern")
-        self._pattern_row.set_text(handler.get("string", ""))
+        self._pattern_row.set_text(handler.get("pattern", ""))
         self._pattern_row.connect("changed", self._on_field_changed)
         self.add_row(self._pattern_row)
 
@@ -136,7 +136,7 @@ class HandlerRow(Adw.ExpanderRow):
     def get_data(self):
         return {
             "matcher": MATCHERS[self._matcher_row.get_selected()],
-            "string": self._pattern_row.get_text(),
+            "pattern": self._pattern_row.get_text(),
             "exec": self._exec_row.get_text(),
         }
 
@@ -167,8 +167,8 @@ class SettingsWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage()
 
         default_group = Adw.PreferencesGroup(
-            title="Default Handler",
-            description="Used when no URL rule matches",
+            title="Default Browser",
+            description="Used for URLs not handled by an app",
         )
         self._default_exec_row = Adw.EntryRow(title="Command")
         self._default_exec_row.set_text(config.get("default", {}).get("exec", ""))
@@ -186,7 +186,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         page.add(default_group)
 
         self._rules_group = Adw.PreferencesGroup(
-            title="URL Rules",
+            title="Application URL Handler Rules",
             description="Rules are evaluated in order; the first match will be used.",
         )
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
@@ -209,7 +209,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def _append_row(self, handler=None):
         row = HandlerRow(
-            handler or {"matcher": "startswith", "string": "", "exec": ""},
+            handler or {"matcher": "startswith", "pattern": "", "exec": ""},
             self._remove_row,
             self._reorder_row,
             self._mark_dirty,
@@ -243,12 +243,12 @@ class SettingsWindow(Adw.ApplicationWindow):
         }
         save_config(config)
         self._save_btn.set_sensitive(False)
-        self._toast_overlay.add_toast(Adw.Toast.new("Settings saved"))
+        self._toast_overlay.add_toast(Adw.Toast.new("Configuration saved"))
 
 
 class URLHandlerSettingsApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="io.github.sowgro.URLHandlerSettings")
+        super().__init__(application_id="net.sowgro.url-handler")
         self.connect("activate", self._on_activate)
 
     def _on_activate(self, _):

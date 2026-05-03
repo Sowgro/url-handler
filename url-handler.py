@@ -19,4 +19,4 @@ if __name__ == "__main__":
     url = sys.argv[1] if len(sys.argv) > 1 else ""
     config = json.load(open('config.json'), object_hook=lambda d: SimpleNamespace(**d))
     exec = getExec()
-    os.system(exec.format(url) + ' &')
+    os.system(exec.replace('%u', url) + ' &')

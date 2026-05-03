@@ -1,0 +1,34 @@
+app-id: net.sowgro.URLHandler
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+command: url-handler
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # flatpak-spawn --host requires this to launch apps outside the sandbox
+  - --talk-name=org.freedesktop.Flatpak
+
+modules:
+  - name: url-handler
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 url-handler /app/bin/url-handler
+      - install -Dm755 url-handler-configuration /app/bin/url-handler-configuration
+      - install -Dm644 url-handler.py /app/lib/url-handler/url-handler.py
+      - install -Dm644 url-handler-configuration.py /app/lib/url-handler/url-handler-configuration.py
+      - install -Dm644 net.sowgro.URLHandler.Configuration.desktop
+          /app/share/applications/net.sowgro.URLHandler.Configuration.desktop
+      - install -Dm644 net.sowgro.URLHandler.desktop
+          /app/share/applications/net.sowgro.URLHandler.desktop
+      - install -Dm644 net.sowgro.URLHandler.metainfo.xml
+          /app/share/metainfo/net.sowgro.URLHandler.metainfo.xml
+      - install -Dm644 icon.svg
+         /app/share/icons/hicolor/scalable/apps/net.sowgro.URLHandler.svg
+      - install -Dm644 icon-configuration.svg
+        /app/share/icons/hicolor/scalable/apps/net.sowgro.URLHandler.Configuration.svg
+    sources:
+      - type: dir
+        path: .

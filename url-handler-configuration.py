@@ -10,17 +10,25 @@ import json
 import os
 import re
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+CONFIG_PATH = os.path.join(
+    os.environ.get('XDG_CONFIG_HOME', os.path.expanduser('~/.config')),
+    'url-handler', 'config.json'
+)
 MATCHERS = ["startswith", "contains", "endswith"]
 MATCHER_LABELS = ["Starts with", "Contains", "Ends with"]
 
 
 def load_config():
-    with open(CONFIG_PATH) as f:
-        return json.load(f)
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    try:
+        with open(CONFIG_PATH) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"default": {"exec": ""}, "handlers": []}
 
 
 def save_config(config):
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, 'w') as f:
         json.dump(config, f, indent=2)
 
@@ -246,7 +254,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
 class URLHandlerSettingsApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="net.sowgro.url-handler-configuration")
+        super().__init__(application_id="net.sowgro.URLHandler.Configuration")
         self.connect("activate", self._on_activate)
 
     def _on_activate(self, _):

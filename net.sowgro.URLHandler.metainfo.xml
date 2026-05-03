@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.sowgro.URLHandler</id>
+  <name>URL Handler</name>
+  <summary>Route URLs to specific applications</summary>
+  <description>
+    <p>Configures custom URL routing rules, sending different URLs to different applications.</p>
+  </description>
+  <launchable type="desktop-id">net.sowgro.URLHandler.desktop</launchable>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <content_rating type="oars-1.1" />
+</component>

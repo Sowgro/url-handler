@@ -1,22 +1,40 @@
 import json
 import os
+import shlex
+import subprocess
 import sys
 from types import SimpleNamespace
 
-def getMatcher(handler: str):
-    match handler:
-        case 'contains' : return lambda a, b: b in a
-        case 'startswith': return lambda a, b: a.startswith(b)
-        case 'endswith'  : return lambda a, b: a.endswith(b)
+CONFIG_PATH = os.path.join(
+    os.environ.get('XDG_CONFIG_HOME', os.path.expanduser('~/.config')),
+    'url-handler', 'config.json'
+)
+MATCHERS = {
+    'contains':   lambda a, b: b in a,
+    'startswith': lambda a, b: a.startswith(b),
+    'endswith':   lambda a, b: a.endswith(b)
+}
 
-def getExec():
+def get_exec():
     for item in config.handlers:
-        if getMatcher(item.matcher)(url, item.pattern):
+        if MATCHERS[item.matcher](url, item.pattern):
             return item.exec
     return config.default.exec
 
 if __name__ == "__main__":
     url = sys.argv[1] if len(sys.argv) > 1 else ""
-    config = json.load(open('config.json'), object_hook=lambda d: SimpleNamespace(**d))
-    exec = getExec()
-    os.system(exec.replace('%u', url) + ' &')
+
+    try:
+        with open(CONFIG_PATH) as f:
+            config = json.load(f, object_hook=lambda d: SimpleNamespace(**d))
+    except FileNotFoundError:
+        subprocess.Popen(['url-handler-configuration'])
+        sys.exit(1)
+
+    cmd = shlex.split(get_exec())
+    cmd = [i if i != '%u' else url for i in cmd]
+
+    if os.path.exists('/.flatpak-info'):
+        subprocess.Popen(['flatpak-spawn', '--host', *cmd])
+    else:
+        subprocess.Popen(cmd)

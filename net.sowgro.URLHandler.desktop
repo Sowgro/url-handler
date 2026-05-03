@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=URL Handler
+Exec=url-handler %u
+Icon=net.sowgro.URLHandler
+Type=Application
+Terminal=false
+Categories=Settings;GNOME;
+NoDisplay=true
+MimeType=x-scheme-handler/https;x-scheme-handler/http;

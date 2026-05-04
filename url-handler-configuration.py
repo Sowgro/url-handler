@@ -5,10 +5,12 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, Gdk, GObject
+from gi.repository import Gtk, Adw, Gdk, GObject, Gio, GLib
 import json
 import os
 import re
+import subprocess
+import threading
 
 CONFIG_PATH = os.path.join(
     os.environ.get('XDG_CONFIG_HOME', os.path.expanduser('~/.config')),
@@ -41,22 +43,187 @@ def app_info_to_exec(app_info):
     return cmdline
 
 
+def _get_icon_name(icon_obj):
+    if not icon_obj:
+        return None
+    try:
+        if isinstance(icon_obj, Gio.ThemedIcon):
+            names = icon_obj.get_names()
+            return names[0] if names else None
+    except Exception:
+        pass
+    return None
+
+
+def _collect_apps_local():
+    apps = []
+    for app in Gio.AppInfo.get_all():
+        if not app.get_commandline():
+            continue
+        apps.append({
+            'name': app.get_display_name(),
+            'icon': _get_icon_name(app.get_icon()),
+            'exec': app_info_to_exec(app),
+        })
+    return sorted(apps, key=lambda a: a['name'].lower())
+
+
+def _collect_apps_host():
+    script = r"""
+import gi
+gi.require_version('Gio', '2.0')
+from gi.repository import Gio
+import json, re
+
+def to_exec(cmd):
+    cmd = re.sub(r'\s*%[uUfF]\s*', ' %u', cmd)
+    return re.sub(r'%[a-zA-Z]', '', cmd).strip()
+
+def get_icon(app):
+    icon_obj = app.get_icon()
+    if not icon_obj:
+        return None
+    try:
+        if isinstance(icon_obj, Gio.ThemedIcon):
+            names = icon_obj.get_names()
+            return names[0] if names else None
+    except Exception:
+        pass
+    return None
+
+apps = []
+for a in Gio.AppInfo.get_all():
+    cmd = a.get_commandline()
+    if not cmd:
+        continue
+    apps.append({'name': a.get_display_name(), 'icon': get_icon(a), 'exec': to_exec(cmd)})
+
+apps.sort(key=lambda a: a['name'].lower())
+print(json.dumps(apps))
+"""
+    try:
+        result = subprocess.run(
+            ['flatpak-spawn', '--host', 'python3', '-c', script],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+    except Exception:
+        pass
+    return []
+
+
+class _AppChooserWindow(Gtk.Window):
+    def __init__(self, parent, on_chosen):
+        super().__init__(title="Choose Application")
+        self.set_transient_for(parent)
+        self.set_modal(True)
+        self.set_default_size(420, 540)
+        self._on_chosen = on_chosen
+        self._search_text = ""
+        self._build()
+        threading.Thread(target=self._load_apps, daemon=True).start()
+
+    def _build(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        header = Adw.HeaderBar()
+        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn.connect("clicked", lambda _: self.close())
+        header.pack_start(cancel_btn)
+        self._select_btn = Gtk.Button(label="Select")
+        self._select_btn.add_css_class("suggested-action")
+        self._select_btn.set_sensitive(False)
+        self._select_btn.connect("clicked", self._on_select)
+        header.pack_end(self._select_btn)
+        box.append(header)
+
+        self._search_entry = Gtk.SearchEntry()
+        self._search_entry.set_margin_start(8)
+        self._search_entry.set_margin_end(8)
+        self._search_entry.set_margin_top(4)
+        self._search_entry.set_margin_bottom(4)
+        self._search_entry.connect("search-changed", self._on_search)
+        self._search_entry.set_sensitive(False)
+        box.append(self._search_entry)
+
+        self._stack = Gtk.Stack()
+
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self._spinner = Gtk.Spinner()
+        self._spinner.set_size_request(32, 32)
+        self._spinner.set_halign(Gtk.Align.CENTER)
+        self._spinner.set_valign(Gtk.Align.CENTER)
+        self._spinner.set_vexpand(True)
+        self._spinner.start()
+        spinner_box.append(self._spinner)
+        self._stack.add_named(spinner_box, "loading")
+
+        scroll = Gtk.ScrolledWindow(vexpand=True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self._listbox = Gtk.ListBox()
+        self._listbox.add_css_class("boxed-list")
+        self._listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self._listbox.set_filter_func(self._filter_func)
+        self._listbox.connect("row-selected", self._on_row_selected)
+        self._listbox.connect("row-activated", self._on_row_activated)
+        scroll.set_child(self._listbox)
+        self._stack.add_named(scroll, "list")
+
+        self._stack.set_visible_child_name("loading")
+        box.append(self._stack)
+        self.set_child(box)
+
+    def _load_apps(self):
+        apps = _collect_apps_host() if os.path.exists('/.flatpak-info') else _collect_apps_local()
+        GLib.idle_add(self._populate, apps)
+
+    def _populate(self, apps):
+        for app in apps:
+            row = Gtk.ListBoxRow()
+            row._app_exec = app['exec']
+            row._app_name = app['name']
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            hbox.set_margin_start(12)
+            hbox.set_margin_end(12)
+            hbox.set_margin_top(8)
+            hbox.set_margin_bottom(8)
+            img = Gtk.Image.new_from_icon_name(app.get('icon') or 'application-x-executable')
+            img.set_pixel_size(32)
+            hbox.append(img)
+            label = Gtk.Label(label=app['name'], xalign=0, hexpand=True)
+            hbox.append(label)
+            row.set_child(hbox)
+            self._listbox.append(row)
+        self._spinner.stop()
+        self._search_entry.set_sensitive(True)
+        self._stack.set_visible_child_name("list")
+
+    def _on_search(self, entry):
+        self._search_text = entry.get_text().lower()
+        self._listbox.invalidate_filter()
+
+    def _filter_func(self, row):
+        if not self._search_text:
+            return True
+        return self._search_text in getattr(row, '_app_name', '').lower()
+
+    def _on_row_selected(self, listbox, row):
+        self._select_btn.set_sensitive(row is not None)
+
+    def _on_row_activated(self, listbox, row):
+        self._on_chosen(row._app_exec)
+        self.close()
+
+    def _on_select(self, _):
+        row = self._listbox.get_selected_row()
+        if row:
+            self._on_chosen(row._app_exec)
+            self.close()
+
+
 def open_app_chooser(parent_win, on_chosen):
-    dialog = Gtk.AppChooserDialog.new_for_content_type(
-        parent_win,
-        Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
-        "x-scheme-handler/https",
-    )
-
-    def on_response(dlg, response):
-        if response == Gtk.ResponseType.OK:
-            info = dlg.get_app_info()
-            if info:
-                on_chosen(app_info_to_exec(info))
-        dlg.destroy()
-
-    dialog.connect("response", on_response)
-    dialog.present()
+    _AppChooserWindow(parent_win, on_chosen).present()
 
 
 class HandlerRow(Adw.ExpanderRow):

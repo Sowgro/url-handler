@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -12,7 +13,8 @@ CONFIG_PATH = os.path.join(
 MATCHERS = {
     'contains':   lambda a, b: b in a,
     'startswith': lambda a, b: a.startswith(b),
-    'endswith':   lambda a, b: a.endswith(b)
+    'endswith':   lambda a, b: a.endswith(b),
+    'regex':      lambda a, b: re.match(b, a)
 }
 
 def get_exec():
@@ -31,8 +33,9 @@ if __name__ == "__main__":
         subprocess.Popen(['url-handler-configuration'])
         sys.exit(1)
 
-    cmd = shlex.split(get_exec())
-    cmd = [i if i != '%u' else url for i in cmd]
+    cmdline = get_exec()
+    cmdline = re.sub(r'%[uUfF]', url, cmdline)
+    cmd = shlex.split(cmdline)
 
     if os.path.exists('/.flatpak-info'):
         subprocess.Popen(['flatpak-spawn', '--host', *cmd])

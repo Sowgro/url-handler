@@ -12,23 +12,29 @@ finish-args:
   - --talk-name=org.freedesktop.Flatpak
 
 modules:
-  - name: url-handler
+  - name: run
     buildsystem: simple
     build-commands:
-      - install -Dm755 url-handler /app/bin/url-handler
-      - install -Dm755 url-handler-configuration /app/bin/url-handler-configuration
-      - install -Dm644 url-handler.py /app/lib/url-handler/url-handler.py
-      - install -Dm644 url-handler-configuration.py /app/lib/url-handler/url-handler-configuration.py
-      - install -Dm644 net.sowgro.URLHandler.Configuration.desktop
-          /app/share/applications/net.sowgro.URLHandler.Configuration.desktop
-      - install -Dm644 net.sowgro.URLHandler.desktop
+      - install -Dm755 url-handler/run 
+          /app/bin/url-handler
+      - install -Dm644 url-handler/url-handler.py
+          /app/lib/url-handler/url-handler.py
+      - install -Dm644 url-handler/net.sowgro.URLHandler.desktop
           /app/share/applications/net.sowgro.URLHandler.desktop
+      - install -Dm644 url-handler/icon.svg
+          /app/share/icons/hicolor/scalable/apps/net.sowgro.URLHandler.svg
+
+      - install -Dm755 url-handler-configuration/run 
+          /app/bin/url-handler-configuration
+      - install -Dm644 url-handler-configuration/url-handler-configuration.py 
+          /app/lib/url-handler/url-handler-configuration.py
+      - install -Dm644 url-handler-configuration/net.sowgro.URLHandler.Configuration.desktop
+          /app/share/applications/net.sowgro.URLHandler.Configuration.desktop
+      - install -Dm644 url-handler-configuration/icon.svg
+          /app/share/icons/hicolor/scalable/apps/net.sowgro.URLHandler.Configuration.svg
+
       - install -Dm644 net.sowgro.URLHandler.metainfo.xml
           /app/share/metainfo/net.sowgro.URLHandler.metainfo.xml
-      - install -Dm644 icon.svg
-         /app/share/icons/hicolor/scalable/apps/net.sowgro.URLHandler.svg
-      - install -Dm644 icon-configuration.svg
-        /app/share/icons/hicolor/scalable/apps/net.sowgro.URLHandler.Configuration.svg
     sources:
       - type: dir
         path: .

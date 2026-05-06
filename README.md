@@ -1,6 +1,6 @@
 # URL Handler
 Configure applications to handle certain URL types
-![img.png](img.png)
+![img.png](screenshot.png)
 
 ### Installation
 ```
@@ -13,3 +13,4 @@ flatpak-builder --user --install --force-clean build-dir net.sowgro.URLHandler.y
 - [ ] Properly handle unselected state in 'Open with' dropdown
   - Related: https://gitlab.gnome.org/GNOME/gtk/-/work_items/7168
 - [ ] Reorganize this project (move away from python?)
+- [ ] Publish on flathub

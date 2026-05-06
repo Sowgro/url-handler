@@ -2,9 +2,9 @@
 <component type="desktop-application">
   <id>net.sowgro.URLHandler</id>
   <name>URL Handler</name>
-  <summary>Route URLs to specific applications</summary>
+  <summary>Open links directly in their associated application</summary>
   <description>
-    <p>Configures custom URL routing rules, sending different URLs to different applications.</p>
+    <p>Configure applications to handle certain URL types</p>
   </description>
   <launchable type="desktop-id">net.sowgro.URLHandler.desktop</launchable>
   <metadata_license>MIT</metadata_license>
